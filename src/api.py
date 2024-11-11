@@ -2,8 +2,8 @@ import anthropic
 import dotenv
 from typing import *
 
-from core_prompts.prompts import load_system_prompt
-from scaffolding.status import basic_status
+from src.core_prompts.prompts import load_system_prompt
+from src.scaffolding.status import basic_status
 
 dotenv.load_dotenv()
 
@@ -50,10 +50,9 @@ class Conversation:
             messages=self.messages
         )
         
-        match response["type"]:
-            case "error":
-                raise "API ERROR!"
-            case "message":
+        if response.get("type") == "error":
+            raise "API ERROR!"
+        elif response.get("type") == "message":
                 content = response["content"]
                 self.append({
                     "role": "assistant",
@@ -62,4 +61,16 @@ class Conversation:
                 assert len(content) == 1
                 response_text = content["text"]
                 return response_text
+            
+    def last_assistant_block(self) -> List[Dict]:
+        messages = []
+        seen_assistant = False
+        for message in self.messages[::-1]:
+            if messages["role"] == "assistant" and seen_assistant:
+                return messages
+            else:
+                if messages["role"] == "assistant":
+                    seen_assistant = True
+                messages.insert(0, message)
+        return messages
         
