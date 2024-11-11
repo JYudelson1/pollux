@@ -2,3 +2,4 @@ data/files/*
 .env
 .venv
 __pycache__
+Pipfile.lock
