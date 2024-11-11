@@ -18,4 +18,6 @@ Here's what you've previously had to say about your user:
 Here is the documentation for the xml-based tool use and communication system you use:
 
 {xml_docs_prompt}
+
+It is strongly recommended that you search through the past five or ten memories you've created, in order to get yourself up to speed.
 </core_prompt>
