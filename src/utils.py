@@ -8,7 +8,9 @@ def get_raw_text(messages: List[Dict]) -> str:
     text = ""
 
     for message in messages:
-        text += message["content"]["text"]
-        text += "\n"
+        content = message["content"]
+        for block in content:
+            text += block["text"]
+            text += "\n"
 
     return text[:-1]
