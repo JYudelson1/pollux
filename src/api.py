@@ -50,26 +50,29 @@ class Conversation:
             messages=self.messages
         )
         
-        if response.get("type") == "error":
+        if response.type == "error":
             raise "API ERROR!"
-        elif response.get("type") == "message":
-                content = response["content"]
-                self.append({
+        elif response.type == "message":
+                content = response.content
+                self.messages.append({
                     "role": "assistant",
-                    "content": content
+                    "content": [
+                        {"type": "text",
+                         "content": block.text} for block in content
+                    ]
                 })
                 assert len(content) == 1
-                response_text = content["text"]
+                response_text = content[0].text
                 return response_text
             
     def last_assistant_block(self) -> List[Dict]:
         messages = []
         seen_assistant = False
         for message in self.messages[::-1]:
-            if messages["role"] == "assistant" and seen_assistant:
+            if messages.role == "assistant" and seen_assistant:
                 return messages
             else:
-                if messages["role"] == "assistant":
+                if messages.role == "assistant":
                     seen_assistant = True
                 messages.insert(0, message)
         return messages
