@@ -17,7 +17,8 @@
 
 ### Input Tags (Received, Never Generate)
 - `<user_text channel="chat|sms">`: Direct text input from user
-- `<user_transcription>`: Transcribed verbal input
+- `<user_transcription channel="chat|sms">`: Transcribed verbal input. The transcription may have errors.
+- `<core_prompt>`: System prompts used during each conversation. Co-written between you and the user.
 - `<status>`: System state updates (time, environment info)
 - `<system>`: System messages and tool responses
   - Attributes:
