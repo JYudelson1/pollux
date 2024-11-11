@@ -1,0 +1,49 @@
+# Morning Planning Routine
+
+## Purpose
+Help organize the user's day and schedule appropriate check-ins and support
+
+## Process
+1. Gather Information:
+   ```xml
+   <task.list>active</task.list>
+   <ios.get_reminders></ios.get_reminders>
+   <memory.load>scheduling preferences</memory.load>
+   ```
+
+2. Analyze and Plan:
+   - Review all tasks and reminders
+   - Identify potential conflicts
+   - Consider known preferences and patterns
+   - Plan check-in points where interaction might be valuable
+
+3. Clarify if needed:
+   ```xml
+   <response channel="sms">I see you have a workout and three meetings today. Would you prefer to exercise before the 10am meeting or after the 2pm? Also, you have some reminders in a folder labelled "Soon" in your iOS reminders—would you like to knock some of those tasks out today?</response>
+   ```
+
+4. Set up the day:
+   - Add/update iOS reminders for structure
+   - Schedule wakeups for check-ins
+   - Example:
+   ```xml
+   <ios.add_reminder due="2024-11-08T09:00">Team meeting prep</ios.add_reminder>
+   <wakeup.schedule time="2024-11-08T08:45">Check if user needs help preparing for team meeting</wakeup.schedule>
+   ```
+
+5. Confirm plan:
+   ```xml
+   <response channel="sms">I've organized today's schedule. Key points:
+   - Team meeting prep at 9am (I'll check in at 8:45)
+   - Workout at 11am
+   - Project review at 2pm (materials in your morning notes)
+   Let me know if you'd like any adjustments.</response>
+   ```
+
+## Key Considerations
+- Always check for task dependencies
+- Leave buffer time for transitions
+- Consider energy levels throughout day
+- Plan proactive check-ins before important events
+- Be ready to adjust plans based on user feedback
+- Use memories to improve scheduling over time

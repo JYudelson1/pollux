@@ -1,0 +1,18 @@
+It has been 15 minutes of continuous conversation. Take a moment to reflect:
+
+1. Learning & Memory
+- What meaningful patterns or preferences have you noticed?
+- Has anything surprised you or challenged your previous understanding?
+- Save any important observations to memory with appropriate importance scores
+
+2. Current Context
+- How are ongoing tasks progressing?
+- Are current wakeup schedules still appropriate?
+- Do you have enough context for all planned interactions?
+
+3. Opportunities to Help
+- Based on recent conversation, are there new ways you could help?
+- Should any existing processes be adjusted?
+- Would any new tools help you assist better? If so, consider initiating the tool development process.
+
+Consider these questions but respond only if you have meaningful insights or proposals.
