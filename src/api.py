@@ -20,6 +20,10 @@ def message_from_text(text: str) -> Dict:
             }]
         }
 
+class Channel:
+    CHAT = 0,
+    SMS = 1
+
 class Conversation:
     messages: List[Dict]
     
@@ -40,7 +44,14 @@ class Conversation:
     # TODO: Add support for images
     # TODO: Add handling for running out of tokens
     # TODO: Handle running out of API Credits
-    def query(self, user_content: str) -> str:
+    def query(self, user_content: str, channel: Channel) -> str:
+        
+        if channel == Channel.CHAT:
+            channel = "chat"
+        elif channel == Channel.SMS:
+            channel = "sms"
+            
+        user_content = f"<user_input channel={channel}>{user_content}</user_input>"
         
         self.messages.append(message_from_text(user_content))
         
