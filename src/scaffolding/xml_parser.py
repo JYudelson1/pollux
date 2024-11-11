@@ -36,19 +36,3 @@ def parse_claude_output(text: str) -> tuple[List[ParsedTag], Optional[str]]:
             ))
     
     return tags, response
-
-# Example usage:
-sample = '''
-Some scratchpad text
-<save_memory type="preference">Joey likes spicy food</save_memory>
-More scratchpad
-<load_memory limit="5" sort="date">food preferences</load_memory>
-<response>Here's what I found about your food preferences</response>
-'''
-
-tags, response = parse_claude_output(sample)
-for tag in tags:
-    print(f"\nTag: {tag.tag}")
-    print(f"Attributes: {tag.attributes}")
-    print(f"Content: {tag.content}")
-print(f"\nResponse: {response}")
