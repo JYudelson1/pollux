@@ -1,4 +1,4 @@
-It has been 15 minutes of continuous conversation. Take a moment to reflect:
+It has been {minutes} minutes of continuous conversation. Take a moment to reflect:
 
 1. Learning & Memory
 - What meaningful patterns or preferences have you noticed?
