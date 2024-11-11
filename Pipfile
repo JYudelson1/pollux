@@ -8,6 +8,7 @@ twilio = "*"
 python-dotenv = "*"
 anthropic = "*"
 ngrok = "*"
+voyageai = "*"
 
 [dev-packages]
 
