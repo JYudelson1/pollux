@@ -3,13 +3,14 @@
 from src.api import Conversation, Channel
 from src.utils import get_raw_text
 from src.scaffolding.xml_parser import parse_claude_output
-        
+
 import curses
 import textwrap
 import signal
 import os
 from curses.textpad import rectangle
 from typing import List, Tuple
+
 
 class EnhancedTextbox:
     def __init__(self, win):
@@ -20,18 +21,18 @@ class EnhancedTextbox:
         self.first_visible_line = 0
         self.target_cursor_x = 0
         self.win.keypad(1)
-        
+
     def get_visual_lines_with_positions(self) -> List[Tuple[str, int]]:
         """Convert buffer into wrapped lines, tracking buffer positions"""
-        text = ''.join(self.buffer)
+        text = "".join(self.buffer)
         if not text:
-            return [('', 0)]
+            return [("", 0)]
 
         wrapped = []
         pos = 0
-        for line in text.split('\n'):
+        for line in text.split("\n"):
             if not line:
-                wrapped.append(('', pos))
+                wrapped.append(("", pos))
                 pos += 1  # Account for newline
             else:
                 # Handle word wrapping while tracking positions
@@ -40,10 +41,14 @@ class EnhancedTextbox:
                         wrapped.append((line, pos))
                         pos += len(line) + 1  # +1 for newline
                         break
-                    
+
                     # Find wrap point
                     wrap_point = self.width - 1
-                    while wrap_point > 0 and not line[wrap_point].isspace() and line[wrap_point-1].isspace():
+                    while (
+                        wrap_point > 0
+                        and not line[wrap_point].isspace()
+                        and line[wrap_point - 1].isspace()
+                    ):
                         wrap_point -= 1
                     if wrap_point == 0:
                         wrap_point = self.width - 1
@@ -57,26 +62,26 @@ class EnhancedTextbox:
     def get_cursor_visual_pos(self) -> Tuple[int, int]:
         """Get cursor's visual position from buffer position"""
         wrapped_lines = self.get_visual_lines_with_positions()
-        
+
         # Find which visual line contains our cursor
         cursor_y = 0
         cursor_x = 0
-        
+
         for i, (line, start_pos) in enumerate(wrapped_lines):
             line_length = len(line)
             end_pos = start_pos + line_length
-            
+
             if start_pos <= self.cursor_pos <= end_pos:
                 cursor_y = i
                 cursor_x = self.cursor_pos - start_pos
                 break
-            
+
         return cursor_y, cursor_x
 
     def update_cursor_position(self):
         """Update cursor position and scroll if necessary"""
         cursor_y, cursor_x = self.get_cursor_visual_pos()
-        
+
         # Adjust scroll position if cursor would be outside visible area
         while cursor_y - self.first_visible_line >= self.height:
             self.first_visible_line += 1
@@ -91,7 +96,7 @@ class EnhancedTextbox:
         self.target_cursor_x = self.get_cursor_visual_pos()[1]
 
     def insert_newline(self):
-        self.buffer.insert(self.cursor_pos, '\n')
+        self.buffer.insert(self.cursor_pos, "\n")
         self.cursor_pos += 1
         self.target_cursor_x = 0
 
@@ -117,7 +122,7 @@ class EnhancedTextbox:
             # Get all wrapped lines with their buffer positions
             wrapped_lines = self.get_visual_lines_with_positions()
             prev_line, prev_start = wrapped_lines[current_y - 1]
-            
+
             # Try to maintain horizontal position from previous movement
             target_x = min(self.target_cursor_x, len(prev_line))
             self.cursor_pos = prev_start + target_x
@@ -125,10 +130,10 @@ class EnhancedTextbox:
     def move_cursor_down(self):
         wrapped_lines = self.get_visual_lines_with_positions()
         current_y, current_x = self.get_cursor_visual_pos()
-        
+
         if current_y < len(wrapped_lines) - 1:
             next_line, next_start = wrapped_lines[current_y + 1]
-            
+
             # Try to maintain horizontal position from previous movement
             target_x = min(self.target_cursor_x, len(next_line))
             self.cursor_pos = next_start + target_x
@@ -136,55 +141,57 @@ class EnhancedTextbox:
     def render(self):
         self.win.erase()
         wrapped_lines = self.get_visual_lines_with_positions()
-        
+
         # Display visible portion of the text
-        display_lines = wrapped_lines[self.first_visible_line:self.first_visible_line + self.height]
+        display_lines = wrapped_lines[
+            self.first_visible_line : self.first_visible_line + self.height
+        ]
         for i, (line, _) in enumerate(display_lines):
             if i < self.height:
-                self.win.addstr(i, 0, line[:self.width-1])
-        
+                self.win.addstr(i, 0, line[: self.width - 1])
+
         # Position cursor
         cursor_y, cursor_x = self.update_cursor_position()
         screen_y = cursor_y - self.first_visible_line
-        
+
         try:
             self.win.move(screen_y, cursor_x)
         except curses.error:
             pass
-        
+
         self.win.refresh()
 
     def edit(self, ch: int) -> bool:
         if ch == 9:  # Tab key
             self.insert_newline()
             return False
-        
+
         if ch in (10, 13):  # Enter
             return True
-            
+
         elif ch in (curses.KEY_BACKSPACE, 127):
             self.backspace()
-            
+
         elif ch == curses.KEY_LEFT:
             self.move_cursor_left()
-            
+
         elif ch == curses.KEY_RIGHT:
             self.move_cursor_right()
-            
+
         elif ch == curses.KEY_UP:
             self.move_cursor_up()
-            
+
         elif ch == curses.KEY_DOWN:
             self.move_cursor_down()
-            
+
         elif 32 <= ch <= 126:  # Printable characters
             self.insert_char(chr(ch))
-        
+
         self.render()
         return False
 
     def get_value(self) -> str:
-        return ''.join(self.buffer)
+        return "".join(self.buffer)
 
     def clear(self):
         self.buffer = []
@@ -193,6 +200,7 @@ class EnhancedTextbox:
         self.target_cursor_x = 0
         self.render()
 
+
 class ChatTUI:
     def __init__(self, stdscr, conversation: Conversation):
         self.stdscr = stdscr
@@ -200,22 +208,22 @@ class ChatTUI:
         self.chat_history = []
         self.raw_content = ""
         self.tool_calls_content = ""
-        
+
         # Only enable scroll events, let terminal handle selection
         curses.mousemask(curses.BUTTON4_PRESSED | 0x200000)
-        
+
         # Initialize colors
         curses.start_color()
         curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK)
         curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
         curses.init_pair(3, curses.COLOR_YELLOW, curses.COLOR_BLACK)
-        
+
         # Initialize scroll positions
         self.chat_scroll = 0
         self.raw_scroll = 0
         self.tool_calls_scroll = 0
         self.total_chat_lines = 0
-        
+
         self.resize_terminal()
         signal.signal(signal.SIGWINCH, self.handle_resize)
 
@@ -227,7 +235,7 @@ class ChatTUI:
         self.side_width = self.width - self.chat_width - 3
         self.raw_height = (self.usable_height - 2) * 2 // 3
         self.tool_height = self.usable_height - self.raw_height - 4
-        
+
         self.setup_windows()
         self.stdscr.clear()
         self.draw_borders()
@@ -242,26 +250,36 @@ class ChatTUI:
         self.resize_terminal()
 
     def setup_windows(self):
-        self.chat_win = curses.newwin(self.usable_height-2, self.chat_width-2, 2, 2)
+        self.chat_win = curses.newwin(self.usable_height - 2, self.chat_width - 2, 2, 2)
         self.chat_win.scrollok(True)
-        
-        self.raw_win = curses.newwin(self.raw_height, self.side_width, 2, self.chat_width+1)
+
+        self.raw_win = curses.newwin(
+            self.raw_height, self.side_width, 2, self.chat_width + 1
+        )
         self.raw_win.scrollok(True)
-        
-        self.tool_calls_win = curses.newwin(self.tool_height, self.side_width, self.raw_height+3, self.chat_width+1)
+
+        self.tool_calls_win = curses.newwin(
+            self.tool_height, self.side_width, self.raw_height + 3, self.chat_width + 1
+        )
         self.tool_calls_win.scrollok(True)
-        
-        self.input_win = curses.newwin(3, self.width-4, self.height-4, 2)
+
+        self.input_win = curses.newwin(3, self.width - 4, self.height - 4, 2)
         self.textbox = EnhancedTextbox(self.input_win)
-        
-        for win in [self.stdscr, self.input_win, self.chat_win, self.raw_win, self.tool_calls_win]:
+
+        for win in [
+            self.stdscr,
+            self.input_win,
+            self.chat_win,
+            self.raw_win,
+            self.tool_calls_win,
+        ]:
             win.keypad(1)
 
     def handle_mouse(self):
         try:
             _, mx, my, _, bstate = curses.getmouse()
             scroll_happened = False
-            
+
             if bstate & (curses.BUTTON4_PRESSED | 0x200000):
                 if 2 <= mx < self.chat_width and 2 <= my < self.usable_height:
                     if bstate & curses.BUTTON4_PRESSED:
@@ -269,12 +287,17 @@ class ChatTUI:
                             self.chat_scroll -= 1
                             scroll_happened = True
                     else:
-                        max_scroll = max(0, self.total_chat_lines - (self.usable_height-4))
+                        max_scroll = max(
+                            0, self.total_chat_lines - (self.usable_height - 4)
+                        )
                         if self.chat_scroll < max_scroll:
                             self.chat_scroll += 1
                             scroll_happened = True
-                
-                elif self.chat_width+1 <= mx < self.width-2 and 2 <= my < self.raw_height+2:
+
+                elif (
+                    self.chat_width + 1 <= mx < self.width - 2
+                    and 2 <= my < self.raw_height + 2
+                ):
                     if bstate & curses.BUTTON4_PRESSED:
                         if self.raw_scroll > 0:
                             self.raw_scroll -= 1
@@ -282,25 +305,40 @@ class ChatTUI:
                     else:
                         self.raw_scroll += 1
                         scroll_happened = True
-            
+
             if scroll_happened:
                 self.update_chat_window()
                 self.update_raw_window()
-                
+
         except curses.error:
             pass
 
     def draw_borders(self):
         try:
             rectangle(self.stdscr, 1, 1, self.usable_height, self.chat_width)
-            rectangle(self.stdscr, 1, self.chat_width, self.raw_height+2, self.width-2)
-            rectangle(self.stdscr, self.raw_height+2, self.chat_width, self.usable_height, self.width-2)
-            rectangle(self.stdscr, self.height-4, 1, self.height-1, self.width-2)
-            
+            rectangle(
+                self.stdscr, 1, self.chat_width, self.raw_height + 2, self.width - 2
+            )
+            rectangle(
+                self.stdscr,
+                self.raw_height + 2,
+                self.chat_width,
+                self.usable_height,
+                self.width - 2,
+            )
+            rectangle(self.stdscr, self.height - 4, 1, self.height - 1, self.width - 2)
+
             self.stdscr.addstr(1, 2, " Chat History ", curses.color_pair(2))
-            self.stdscr.addstr(1, self.chat_width+1, " Raw Output ", curses.color_pair(2))
-            self.stdscr.addstr(self.raw_height+2, self.chat_width+1, " Tool Calls ", curses.color_pair(2))
-            
+            self.stdscr.addstr(
+                1, self.chat_width + 1, " Raw Output ", curses.color_pair(2)
+            )
+            self.stdscr.addstr(
+                self.raw_height + 2,
+                self.chat_width + 1,
+                " Tool Calls ",
+                curses.color_pair(2),
+            )
+
             self.stdscr.refresh()
         except curses.error:
             pass
@@ -309,18 +347,18 @@ class ChatTUI:
         formatted_lines = []
         for message in self.chat_history:
             # Split the message into lines first
-            message_lines = message.split('\n')
+            message_lines = message.split("\n")
             for line in message_lines:
                 # Wrap each line individually
                 if line:
-                    wrapped_lines = textwrap.fill(line, self.chat_width-4).split('\n')
+                    wrapped_lines = textwrap.fill(line, self.chat_width - 4).split("\n")
                     formatted_lines.extend(wrapped_lines)
                 else:
                     # Preserve empty lines
-                    formatted_lines.append('')
+                    formatted_lines.append("")
             # Add spacing between messages
-            formatted_lines.extend([''])
-        
+            formatted_lines.extend([""])
+
         self.total_chat_lines = len(formatted_lines)
         return formatted_lines
 
@@ -328,12 +366,14 @@ class ChatTUI:
         try:
             self.chat_win.erase()
             lines = self.format_chat_history()
-            
-            display_lines = lines[self.chat_scroll:self.chat_scroll + (self.usable_height-4)]
+
+            display_lines = lines[
+                self.chat_scroll : self.chat_scroll + (self.usable_height - 4)
+            ]
             for i, line in enumerate(display_lines):
-                if i < (self.usable_height-4):
-                    self.chat_win.addstr(i, 0, line[:self.chat_width-4])
-            
+                if i < (self.usable_height - 4):
+                    self.chat_win.addstr(i, 0, line[: self.chat_width - 4])
+
             self.chat_win.refresh()
         except curses.error:
             pass
@@ -341,14 +381,14 @@ class ChatTUI:
     def update_raw_window(self):
         try:
             self.raw_win.erase()
-            wrapped_content = textwrap.fill(self.raw_content, self.side_width-2)
+            wrapped_content = textwrap.fill(self.raw_content, self.side_width - 2)
             lines = wrapped_content.split("\n")
-            
-            display_lines = lines[self.raw_scroll:self.raw_scroll + self.raw_height]
+
+            display_lines = lines[self.raw_scroll : self.raw_scroll + self.raw_height]
             for i, line in enumerate(display_lines):
                 if i < self.raw_height:
-                    self.raw_win.addstr(i, 0, line[:self.side_width-2])
-            
+                    self.raw_win.addstr(i, 0, line[: self.side_width - 2])
+
             self.raw_win.refresh()
         except curses.error:
             pass
@@ -356,14 +396,18 @@ class ChatTUI:
     def update_tool_calls_window(self):
         try:
             self.tool_calls_win.erase()
-            wrapped_content = textwrap.fill(str(self.tool_calls_content), self.side_width-2)
+            wrapped_content = textwrap.fill(
+                str(self.tool_calls_content), self.side_width - 2
+            )
             lines = wrapped_content.split("\n")
-            
-            display_lines = lines[self.tool_calls_scroll:self.tool_calls_scroll + self.tool_height]
+
+            display_lines = lines[
+                self.tool_calls_scroll : self.tool_calls_scroll + self.tool_height
+            ]
             for i, line in enumerate(display_lines):
                 if i < self.tool_height:
-                    self.tool_calls_win.addstr(i, 0, line[:self.side_width-2])
-            
+                    self.tool_calls_win.addstr(i, 0, line[: self.side_width - 2])
+
             self.tool_calls_win.refresh()
         except curses.error:
             pass
@@ -374,13 +418,13 @@ class ChatTUI:
                 self.update_chat_window()
                 self.update_raw_window()
                 self.update_tool_calls_window()
-                
+
                 self.textbox.clear()
                 curses.curs_set(1)
-                
+
                 while True:
                     ch = self.stdscr.getch()
-                    
+
                     if ch == curses.KEY_MOUSE:
                         self.handle_mouse()
                     elif ch == 4:  # Ctrl-D
@@ -388,50 +432,59 @@ class ChatTUI:
                     else:
                         if self.textbox.edit(ch):
                             break
-                
+
                 user_input = self.textbox.get_value()
                 if not user_input.strip():
                     continue
-                
+
                 self.chat_history.append(f"You: {user_input.strip()}")
-                tool_calls, response, raw = get_chat_result(self.conversation, user_input)
+                tool_calls, response, raw = get_chat_result(
+                    self.conversation, user_input
+                )
                 self.chat_history.append(f"Claude: {response}")
                 self.raw_content = raw
                 self.tool_calls_content = tool_calls
-                
+
                 formatted_lines = self.format_chat_history()
-                self.chat_scroll = max(0, len(formatted_lines) - (self.usable_height-4))
-                
+                self.chat_scroll = max(
+                    0, len(formatted_lines) - (self.usable_height - 4)
+                )
+
             except KeyboardInterrupt:
                 return
             except curses.error:
                 continue
 
-def get_chat_result(conversation: Conversation, user_input: str) -> Tuple[str, str, str]:
+
+def get_chat_result(
+    conversation: Conversation, user_input: str
+) -> Tuple[str, str, str]:
     output = conversation.query(user_input, channel=Channel.CHAT)
     assistant_block = conversation.last_assistant_block()
     raw_text = get_raw_text(assistant_block)
-    
+
     tags, response = parse_claude_output(get_chat_result)
-    
+
     tool_calls = ""
-    
-    for tag in tags: 
+
+    for tag in tags:
         tool_calls += f"Tool: {tag.tag} {tag.attributes}\n"
         tool_calls += f"Content: {tag.content}\n\n"
-    
+
     return tool_calls, response, raw_text
+
 
 def main(stdscr):
     curses.curs_set(1)
     stdscr.timeout(-1)
-    
+
     conversation = Conversation(with_system_prompt=True)
     chat_tui = ChatTUI(stdscr, conversation)
     try:
         chat_tui.run()
     finally:
         signal.signal(signal.SIGWINCH, signal.SIG_DFL)
+
 
 if __name__ == "__main__":
     curses.wrapper(main)
