@@ -1,3 +1,4 @@
 data/files/*
-secrets.env
+.env
 .venv
+__pycache__
