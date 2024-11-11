@@ -38,7 +38,7 @@
 - `<memory_load>`: Retrieve memories
   - Attributes:
     - `limit`: Integer > 0 (optional, default=5)
-    - `sort`: "relevance" | "date" | "importance" (optional, default="relevance")
+    - `sort`: "relevance" | "date" (optional, default="relevance")
   - Content: Query text
 
 - `<memory_update>`: Modify existing memory
