@@ -49,6 +49,22 @@ class Conversation:
             status_message = message_from_text(status)
             self.messages.append(status_message)
             
+            self.messages.append({
+                "role": "assistant",
+                "content":
+                    [{"type": "text", "text": 'Let me check my memories. \n<memory_load limit="15" sort="date"></memory_load>'}]
+            })
+            
+            
+            memory_response = self.tool_server.use_tools([ParsedTag(tag="memory_load", attributes={"limit": "15", "sort": "date"}, content=" ")])
+            with open(self.chat_storage, "a+") as f:
+                f.write(memory_response)
+            memory_message = message_from_text(memory_response)
+            memory_response
+            memory_message["content"][0]["cache_control"] = {"type": "ephemeral"}
+            self.messages.append(memory_message)
+            
+            
     def _send_and_receive(self) -> str:
         response = client.beta.prompt_caching.messages.create(
             model=claude_model,
