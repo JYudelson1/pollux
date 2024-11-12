@@ -2,6 +2,7 @@ from typing import *
 
 from src.tools.memory import MemoryTool
 from src.tools.source import SourceTool
+from src.tools.files import FilesTool
 
 from src.scaffolding.xml_parser import ParsedTag
 
@@ -9,6 +10,7 @@ class ToolServer:
     def __init__(self) -> None:
         self.memory_tool: MemoryTool = MemoryTool()
         self.source_tool: SourceTool = SourceTool()
+        self.files_tool: FilesTool = FilesTool()
         
     def use_tools(self, tools: List[ParsedTag]) -> Optional[str]:
         system_response = ""
@@ -25,8 +27,7 @@ class ToolServer:
     def use_tool(self, tag: ParsedTag) -> Optional[str]:
         try:
             output = self._try_use_tool(tag)
-            if output is not None:
-                return f'<system type="{tag.tag}" status="success">{output}</system>'
+            return f'<system type="{tag.tag}" status="success">{output if output is not None else ""}</system>'
         except Exception as e:
             return f'<system type="{tag.tag}" status="error">{e}</system>'
         
@@ -41,5 +42,11 @@ class ToolServer:
             return self.source_tool.read_src(**tag.attributes)
         elif tag.tag == "src_list":
             return self.source_tool.list_src(**tag.attributes)
+        elif tag.tag == "file_write":
+            self.files_tool.write_file(content=tag.content, **tag.attributes)
+        elif tag.tag == "file_read":
+            return self.files_tool.read_file(**tag.attributes)
+        elif tag.tag == "file_list":
+            return self.files_tool.list_files(**tag.attributes)
         else:
             raise NotImplementedError
