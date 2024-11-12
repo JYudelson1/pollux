@@ -4,7 +4,7 @@ from typing import *
 from uuid import UUID
 
 def make_xml_once(memory: Memory, relevance: float) -> str:
-    return f'<memory id="{memory.uuid}" date="{timestamp(memory.timestamp)} relevance={relevance:.3f}" importance="{memory.importance}">\n\t{memory.content}\n</memory>'
+    return f'<memory id="{memory.uuid}" date="{timestamp(memory.timestamp)}" relevance={relevance:.3f}" importance="{memory.importance}">\n\t{memory.content}\n</memory>'
 
 def make_xml(sorted_memories: List[Memory], relevances: Dict[UUID, float]) -> str:
     text = '<system type="memory_load">'
@@ -18,4 +18,4 @@ def make_xml(sorted_memories: List[Memory], relevances: Dict[UUID, float]) -> st
     return text
 
 def timestamp(dt: datetime) -> str:
-    f"{dt.month} {dt.day} {dt.year} ({dt.hour}:{dt.minute})"
+    return f"{dt.month} {dt.day} {dt.year} ({dt.hour}:{dt.minute})"
