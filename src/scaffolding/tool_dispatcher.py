@@ -27,7 +27,8 @@ class ToolServer:
     def use_tool(self, tag: ParsedTag) -> Optional[str]:
         try:
             output = self._try_use_tool(tag)
-            return f'<system type="{tag.tag}" status="success">{output if output is not None else ""}</system>'
+            if output is not None:
+                return f'<system type="{tag.tag}" status="success">{output}</system>'
         except Exception as e:
             return f'<system type="{tag.tag}" status="error">{e}</system>'
         
