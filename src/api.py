@@ -4,6 +4,8 @@ from typing import *
 
 from src.core_prompts.prompts import load_system_prompt
 from src.scaffolding.status import basic_status
+from src.scaffolding.tool_dispatcher import ToolServer
+from src.scaffolding.xml_parser import ParsedTag
 from src.utils import ROOT
 
 dotenv.load_dotenv()
@@ -24,9 +26,11 @@ class Channel:
 
 class Conversation:
     messages: List[Dict]
+    tool_server: ToolServer
 
     def __init__(self, with_system_prompt: bool = True) -> None:
         self.messages = []
+        self.tool_server = ToolServer()
 
         if with_system_prompt:
             system_prompt = load_system_prompt()
@@ -36,20 +40,8 @@ class Conversation:
             status = basic_status()
             status_message = message_from_text(status)
             self.messages.append(status_message)
-
-    # TODO: Add support for images
-    # TODO: Add handling for running out of tokens
-    # TODO: Handle running out of API Credits
-    def query(self, user_content: str, channel: Channel) -> str:
-        if channel == Channel.CHAT:
-            channel = "chat"
-        elif channel == Channel.SMS:
-            channel = "sms"
-
-        user_content = f"<user_input channel={channel}>{user_content}</user_input>"
-
-        self.messages.append(message_from_text(user_content))
-
+            
+    def _send_and_receive(self) -> str:
         response = client.messages.create(
             model=claude_model,
             max_tokens=max_tokens_per_message,
@@ -70,9 +62,28 @@ class Conversation:
             )
             assert len(content) == 1
             response_text = content[0].text
-            with open(ROOT / "logs" / "response.txt", "w+") as f:
+            with open(ROOT / "logs" / "conversation.txt", "a+") as f:
                 f.write(response_text)
+                
             return response_text
+
+    # TODO: Add support for images
+    # TODO: Add handling for running out of tokens
+    # TODO: Handle running out of API Credits
+    def query(self, user_content: str, channel: Channel) -> str:
+        if channel == Channel.CHAT:
+            channel = "chat"
+        elif channel == Channel.SMS:
+            channel = "sms"
+
+        user_content = f"<user_input channel={channel}>{user_content}</user_input>"
+
+        self.messages.append(message_from_text(user_content))
+        
+        with open(ROOT / "logs" / "conversation.txt", "a") as f:
+            f.write(user_content)
+
+        return self._send_and_receive()
 
     def last_assistant_block(self) -> List[Dict]:
         messages = []
@@ -85,3 +96,18 @@ class Conversation:
                     seen_assistant = True
                 messages.insert(0, message)
         return messages
+    
+    def use_tools(self, tool_calls: List[ParsedTag]) -> Optional[str]:
+        # If the tools provide system responses to be processed by 
+        # the assistant, this will call the tools, call the model,
+        # and then finally return the new response.
+        # If none of the tools need to be looked at, simply processes the 
+        # tool calls and returns None
+        
+        system_response = self.tool_server.use_tools(tool_calls)
+        
+        if system_response is not None:
+            with open(ROOT / "logs" / "conversation.txt", "a+") as f:
+                f.write(system_response)
+            self.messages.append(message_from_text(system_response))
+            return self._send_and_receive()
