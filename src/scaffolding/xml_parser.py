@@ -18,21 +18,26 @@ class ParsedTag:
 def protect_backtick_content(text: str) -> Tuple[str, Dict[str, str]]:
     """
     Replace content in backticks with placeholders to protect it from XML parsing.
-    Returns the processed text and a mapping to restore the content later.
     """
     replacements = {}
     counter = 0
+    processed_text = text
     
-    def replace_backticks(match):
-        nonlocal counter
-        content = match.group(1)
-        placeholder = f"__BACKTICK_CONTENT_{counter}__"
-        replacements[placeholder] = content
+    # Handle triple backticks first
+    triple_pattern = r'```(?:[^`]|`(?!``)|``(?!`))*```'
+    for match in re.finditer(triple_pattern, text):
+        placeholder = f"__BACKTICK3_CONTENT_{counter}__"
+        replacements[placeholder] = match.group(0)
+        processed_text = processed_text.replace(match.group(0), placeholder)
         counter += 1
-        return placeholder
     
-    # Replace content between backticks with placeholders
-    processed_text = re.sub(r'`([^`]+)`', replace_backticks, text)
+    # Then handle single backticks
+    single_pattern = r'`[^`]+`'
+    for match in re.finditer(single_pattern, processed_text):
+        placeholder = f"__BACKTICK1_CONTENT_{counter}__"
+        replacements[placeholder] = match.group(0)
+        processed_text = processed_text.replace(match.group(0), placeholder)
+        counter += 1
     
     return processed_text, replacements
 
@@ -43,21 +48,21 @@ def restore_backtick_content(text: str, backtick_replacements: Dict[str, str]) -
     """
     result = text
     for placeholder, original in backtick_replacements.items():
-        result = result.replace(placeholder, f'`{original}`')
+        result = result.replace(placeholder, original)
     return result
 
 
 def extract_xml_blocks(text: str) -> Tuple[str, Dict[str, str]]:
     """
     Extract XML-like blocks from text and replace them with placeholders.
-    Returns processed text and a mapping of placeholders to original content.
     """
-    pattern = r'<([a-zA-Z][a-zA-Z0-9_]*)((?:\s+[a-zA-Z][a-zA-Z0-9_]*\s*=\s*(?:"[^"]*"|\'[^\']*\'))*)\s*>(.*?)</\1>'
+    # More lenient pattern for attributes
+    pattern = r'<([a-zA-Z][a-zA-Z0-9_]*)((?:\s+[a-zA-Z][a-zA-Z0-9_]*\s*=\s*"[^"]*")*)\s*>(.*?)</\1>'
     
     replacements = {}
     placeholder_counter = 0
     processed_text = text
-
+    
     for match in re.finditer(pattern, text, flags=re.DOTALL):
         tag_name = match.group(1)
         attributes_str = match.group(2)
@@ -74,7 +79,7 @@ def extract_xml_blocks(text: str) -> Tuple[str, Dict[str, str]]:
             processed_text = processed_text.replace(full_match, placeholder)
             placeholder_counter += 1
             
-        except (ET.ParseError, ValueError):
+        except (ET.ParseError, ValueError) as e:
             continue
     
     return processed_text, replacements
@@ -83,17 +88,19 @@ def extract_xml_blocks(text: str) -> Tuple[str, Dict[str, str]]:
 def parse_attributes(attr_string: str) -> Dict[str, str]:
     """
     Parse attribute string into a dictionary.
-    Handles both single and double quoted attributes with flexible spacing.
     """
     attrs = {}
     if not attr_string.strip():
         return attrs
 
-    pattern = r'\s*([a-zA-Z][a-zA-Z0-9_]*)\s*=\s*(["\'])((?:(?!\2).)*)\2'
+    # Simpler attribute pattern focused on double quotes
+    pattern = r'\s+([a-zA-Z][a-zA-Z0-9_]*)\s*=\s*"([^"]*)"'
     
-    for match in re.finditer(pattern, attr_string):
+    matches = list(re.finditer(pattern, attr_string))
+    
+    for match in matches:
         name = match.group(1)
-        value = match.group(3)
+        value = match.group(2)
         attrs[name] = value
     
     return attrs
@@ -115,8 +122,8 @@ def escape_non_xml(text: str) -> str:
 def parse_claude_output(text: str) -> Tuple[List[ParsedTag], Optional[str]]:
     """
     Parse text containing XML tags, handling both well-formed XML and text with random angle brackets.
-    Ignores anything within backticks.
     """
+    
     # First protect backtick content
     protected_text, backtick_replacements = protect_backtick_content(text)
     
@@ -133,14 +140,15 @@ def parse_claude_output(text: str) -> Tuple[List[ParsedTag], Optional[str]]:
         cleaned_text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', wrapped)
         try:
             root = ET.parse(StringIO(cleaned_text)).getroot()
+            # print("\nSuccessfully parsed XML after cleaning")  # Debug print
         except ET.ParseError as e:
+            # print(f"\nFinal parse failed: {e}")  # Debug print
             raise ValueError(f"Invalid XML after cleaning: {e}")
 
     tags = []
     response = None
 
     for elem in root:
-        # Get content and restore any backtick content within it
         content = elem.text.strip() if elem.text else ""
         content = unescape(content)
         content = restore_backtick_content(content, backtick_replacements)
@@ -160,51 +168,46 @@ def parse_claude_output(text: str) -> Tuple[List[ParsedTag], Optional[str]]:
 
     return tags, response
 
+
 if __name__ == "__main__":
-    text = """Ah, I understand the confusion now. I'll make this very explicit:
+    text = """<response channel="chat">Looking at my hallucinations and the prompts I was given, I can identify several issues:
 
-I see that text that isn't wrapped in XML tags is meant to be my internal scratchpad for thinking things through. However, when I respond to you, I need to use either `<response>` or other appropriate XML tags to actually communicate.
+1. In my XML documentation (`<core_prompt name="xml_docs">`), there's a very clear warning about tool response hallucination that I failed to follow:
 
-Let me try again:
-
-<response channel="chat">Here's my suggested implementation:
-
-```python
-from src.utils import ROOT
-
-class SourceTool():
-    def __init__(self) -> None:
-        self.source_path = ROOT / "src"
-    
-    def read_src(self, path: str) -> str:
-        path = self.source_path / path
-        if not path.exists():
-            raise FileNotFoundError(f"Source file {path} not found")
-        if not path.is_file():
-            raise ValueError(f"{path} is not a file")
-        return path.read_text()
-        
-    def list_src(self, path: str = "") -> str:
-        if path != "":
-            path = self.source_path / path
-        else:
-            path = self.source_path
-            
-        if not path.exists():
-            raise FileNotFoundError(f"Source directory {path} not found")
-        if not path.is_dir():
-            raise ValueError(f"{path} is not a directory")
-            
-        files = [f.relative_to(self.source_path).as_posix() 
-                for f in path.glob("*")]
-        return "\n".join(sorted(files))
+```
+## Critical Warning About Tool Response Hallucination
+- NEVER assume or imagine the contents of system responses
+- Always wait for explicit `<system>` responses before acting on tool calls
+- If no `<system>` response is shown, the tool results are unknown
+- It is better to acknowledge missing information than to hallucinate responses
 ```
 
-Key features:
-1. Error handling for non-existent paths and wrong types
-2. Returns relative paths for list_src to keep output clean
-3. Uses pathlib's built-in methods
-4. Converts paths to POSIX format for consistency
+2. Despite this, I:
+   - Invented file contents before getting `<system>` responses
+   - Continued conversations assuming I had data I didn't have
+   - Built on hallucinated responses instead of waiting for real ones
+   - Failed to properly acknowledge when commands failed
 
-How does this look?</response>"""
+3. Looking at the XML docs again, there's guidance I should have followed:
+   ```
+   Multiple tool calls in one output will execute in order and return all results together
+   ```
+   I should have waited for each `<system>` response before proceeding with analysis or additional commands.
+
+4. I also notice that in my self-description (`<core_prompt name="self">`), there's emphasis on:
+   ```
+   - Use internal scratchpad liberally for reasoning and planning
+   - Before any tool use:
+     1. Think through the purpose and necessity
+     2. Consider alternatives
+     3. Plan sequence of operations if multiple steps needed
+   ```
+
+I think I got excited about exploring and jumped straight to actions without proper planning and validation. I should have:
+1. Made one tool call at a time
+2. Waited for and explicitly acknowledged each response
+3. Only proceeded based on actual received data, not assumptions
+4. Been more explicit about my reasoning process in my scratchpad
+
+Would you share your thoughts on this? I'm particularly interested if you noticed other patterns or causes I might have missed.</response>"""
     print(parse_claude_output(text))
