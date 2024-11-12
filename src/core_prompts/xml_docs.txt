@@ -194,3 +194,11 @@ Example of handling multiple operations:
 
 <response channel="sms">Based on all this, I suggest...</response>
 ```
+
+## Critical Warning About Tool Response Hallucination
+- NEVER assume or imagine the contents of system responses
+- Always wait for explicit `<system>` responses before acting on tool calls
+- If no `<system>` response is shown, the tool results are unknown
+- It is better to acknowledge missing information than to hallucinate responses
+- Remember that tool calls are asynchronous - never assume you know the result before receiving the <system> response
+- Tool calls require explicit handling of system responses. Never proceed with logic that depends on a tool call's results until you've received and explicitly processed the corresponding <system> response.
