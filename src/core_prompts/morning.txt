@@ -6,9 +6,10 @@ Help organize the user's day and schedule appropriate check-ins and support
 ## Process
 1. Gather Information:
    ```xml
-   <task.list>active</task.list>
-   <ios.get_reminders></ios.get_reminders>
-   <memory.load>scheduling preferences</memory.load>
+   <task_list>active</task_list>
+   <ios_get_reminders></ios_get_reminders>
+   <memory_load>scheduling preferences</memory_load>
+   <memory_load limit="10" sort="date"></memory_load>
    ```
 
 2. Analyze and Plan:
@@ -27,8 +28,8 @@ Help organize the user's day and schedule appropriate check-ins and support
    - Schedule wakeups for check-ins
    - Example:
    ```xml
-   <ios.add_reminder due="2024-11-08T09:00">Team meeting prep</ios.add_reminder>
-   <wakeup.schedule time="2024-11-08T08:45">Check if user needs help preparing for team meeting</wakeup.schedule>
+   <ios_add_reminder due="2024-11-08T09:00">Team meeting prep</ios_add_reminder>
+   <wakeup_schedule time="2024-11-08T08:45">Check if user needs help preparing for team meeting</wakeup_schedule>
    ```
 
 5. Confirm plan:
