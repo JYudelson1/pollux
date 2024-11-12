@@ -116,7 +116,7 @@
   - Attributes:
     - `channel`: "sms" | "chat" (optional, default="sms")
   - Content: Response text
-  - Maximum one per output, executed last
+  - Remember that all messages will be by default invisible to the user, umless you send them inside `<response>` tags
   - Channel Selection:
     - Default to SMS for safety/reachability
     - Match the channel of incoming communication if present
@@ -137,7 +137,7 @@
   - Attributes:
     - `prompt`: String (required) - Which prompt to update ("self" | "xml_docs" | "user", etc.)
     - `mode`: "append" | "overwrite" (optional, default="append")
-  - Content: New/additional prompt content. Especially useful as you write new tools to be added to the XML docs, or as you learn new information about your user that would be crucial for every instance of you to know as well.
+  - Content: New/additional prompt content. Especially useful as you write new tools to be added to the XML docs, or as you learn new information about your user that would be crucial for every instance of you to know as well. Always ask before using this.
 
 ## Example Sequential Flows
 
