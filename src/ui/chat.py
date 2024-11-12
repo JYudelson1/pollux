@@ -8,9 +8,9 @@ import curses
 import textwrap
 import signal
 import os
+import time
 from curses.textpad import rectangle
 from typing import List, Tuple
-
 
 class EnhancedTextbox:
     def __init__(self, win):
@@ -21,177 +21,183 @@ class EnhancedTextbox:
         self.first_visible_line = 0
         self.target_cursor_x = 0
         self.win.keypad(1)
-
-    def get_visual_lines_with_positions(self) -> List[Tuple[str, int]]:
-        """Convert buffer into wrapped lines, tracking buffer positions"""
-        text = "".join(self.buffer)
-        if not text:
-            return [("", 0)]
-
-        wrapped = []
-        pos = 0
-        for line in text.split("\n"):
-            if not line:
-                wrapped.append(("", pos))
-                pos += 1  # Account for newline
-            else:
-                # Handle word wrapping while tracking positions
-                while line:
-                    if len(line) <= self.width - 1:
-                        wrapped.append((line, pos))
-                        pos += len(line) + 1  # +1 for newline
-                        break
-
-                    # Find wrap point
-                    wrap_point = self.width - 1
-                    while (
-                        wrap_point > 0
-                        and not line[wrap_point].isspace()
-                        and line[wrap_point - 1].isspace()
-                    ):
-                        wrap_point -= 1
-                    if wrap_point == 0:
-                        wrap_point = self.width - 1
-
-                    wrapped.append((line[:wrap_point], pos))
-                    pos += wrap_point
-                    line = line[wrap_point:].lstrip()
-
-        return wrapped
+        self.last_char_time = 0
 
     def get_cursor_visual_pos(self) -> Tuple[int, int]:
-        """Get cursor's visual position from buffer position"""
-        wrapped_lines = self.get_visual_lines_with_positions()
-
-        # Find which visual line contains our cursor
-        cursor_y = 0
-        cursor_x = 0
-
-        for i, (line, start_pos) in enumerate(wrapped_lines):
-            line_length = len(line)
-            end_pos = start_pos + line_length
-
-            if start_pos <= self.cursor_pos <= end_pos:
-                cursor_y = i
-                cursor_x = self.cursor_pos - start_pos
-                break
-
+        """Calculate cursor's visual position based on buffer position"""
+        text_before_cursor = ''.join(self.buffer[:self.cursor_pos])
+        lines_before_cursor = text_before_cursor.split('\n')
+        
+        # Cursor's line number
+        cursor_y = len(lines_before_cursor) - 1
+        
+        # Position in current line
+        current_line = lines_before_cursor[-1]
+        # Handle line wrapping
+        wrapped_lines_before = []
+        for i, line in enumerate(lines_before_cursor[:-1]):
+            wrapped_lines_before.extend(textwrap.wrap(line, self.width - 1) or [''])
+        
+        current_line_wrapped = textwrap.wrap(current_line, self.width - 1) or ['']
+        cursor_y = len(wrapped_lines_before) + len(current_line_wrapped) - 1
+        
+        # Position in final wrapped line
+        if current_line:
+            last_part_len = len(current_line) % (self.width - 1)
+            cursor_x = last_part_len if last_part_len > 0 else len(current_line_wrapped[-1])
+        else:
+            cursor_x = 0
+            
         return cursor_y, cursor_x
 
-    def update_cursor_position(self):
-        """Update cursor position and scroll if necessary"""
-        cursor_y, cursor_x = self.get_cursor_visual_pos()
-
-        # Adjust scroll position if cursor would be outside visible area
+    def ensure_cursor_visible(self):
+        """Adjust scroll position to keep cursor visible"""
+        cursor_y, _ = self.get_cursor_visual_pos()
+        
+        # If cursor is below visible area, scroll down
         while cursor_y - self.first_visible_line >= self.height:
             self.first_visible_line += 1
+            
+        # If cursor is above visible area, scroll up
         while cursor_y < self.first_visible_line:
             self.first_visible_line = cursor_y
 
-        return cursor_y, cursor_x
+    def render(self):
+        """Render the textbox contents"""
+        self.win.erase()
+        
+        # Get complete text and wrap it
+        text = ''.join(self.buffer)
+        wrapped_lines = []
+        for line in text.split('\n'):
+            if line:
+                wrapped_lines.extend(textwrap.wrap(line, self.width - 1) or [''])
+            else:
+                wrapped_lines.append('')
+                
+        # Display visible portion
+        display_lines = wrapped_lines[self.first_visible_line:self.first_visible_line + self.height]
+        for i, line in enumerate(display_lines):
+            if i < self.height:
+                self.win.addstr(i, 0, line[:self.width-1])
+        
+        # Position cursor
+        cursor_y, cursor_x = self.get_cursor_visual_pos()
+        screen_y = cursor_y - self.first_visible_line
+        try:
+            self.win.move(screen_y, cursor_x)
+        except curses.error:
+            pass
+        
+        self.win.refresh()
+
+    def is_pasting(self) -> bool:
+        current_time = time.time()
+        is_paste = (current_time - self.last_char_time) < 0.01
+        self.last_char_time = current_time
+        return is_paste
 
     def insert_char(self, ch: str):
         self.buffer.insert(self.cursor_pos, ch)
         self.cursor_pos += 1
-        self.target_cursor_x = self.get_cursor_visual_pos()[1]
+        self.ensure_cursor_visible()
 
     def insert_newline(self):
-        self.buffer.insert(self.cursor_pos, "\n")
+        self.buffer.insert(self.cursor_pos, '\n')
         self.cursor_pos += 1
-        self.target_cursor_x = 0
+        self.ensure_cursor_visible()
 
     def backspace(self):
         if self.cursor_pos > 0:
             self.buffer.pop(self.cursor_pos - 1)
             self.cursor_pos -= 1
-            self.target_cursor_x = self.get_cursor_visual_pos()[1]
+            self.ensure_cursor_visible()
 
     def move_cursor_left(self):
         if self.cursor_pos > 0:
             self.cursor_pos -= 1
-            self.target_cursor_x = self.get_cursor_visual_pos()[1]
+            self.ensure_cursor_visible()
 
     def move_cursor_right(self):
         if self.cursor_pos < len(self.buffer):
             self.cursor_pos += 1
-            self.target_cursor_x = self.get_cursor_visual_pos()[1]
+            self.ensure_cursor_visible()
 
     def move_cursor_up(self):
-        current_y, current_x = self.get_cursor_visual_pos()
-        if current_y > 0:
-            # Get all wrapped lines with their buffer positions
-            wrapped_lines = self.get_visual_lines_with_positions()
-            prev_line, prev_start = wrapped_lines[current_y - 1]
-
-            # Try to maintain horizontal position from previous movement
-            target_x = min(self.target_cursor_x, len(prev_line))
-            self.cursor_pos = prev_start + target_x
+        # Find the previous line's equivalent position
+        cursor_y, cursor_x = self.get_cursor_visual_pos()
+        if cursor_y > 0:
+            # Move cursor to beginning of current line
+            text = ''.join(self.buffer)
+            lines = text.split('\n')
+            pos = self.cursor_pos
+            while pos > 0 and text[pos-1] != '\n':
+                pos -= 1
+            # Then move back to previous line
+            if pos > 0:
+                pos -= 1
+                while pos > 0 and text[pos-1] != '\n':
+                    pos -= 1
+                # Move to equivalent x position
+                self.cursor_pos = pos + min(cursor_x, len(text[pos:].split('\n')[0]))
+                self.ensure_cursor_visible()
 
     def move_cursor_down(self):
-        wrapped_lines = self.get_visual_lines_with_positions()
-        current_y, current_x = self.get_cursor_visual_pos()
-
-        if current_y < len(wrapped_lines) - 1:
-            next_line, next_start = wrapped_lines[current_y + 1]
-
-            # Try to maintain horizontal position from previous movement
-            target_x = min(self.target_cursor_x, len(next_line))
-            self.cursor_pos = next_start + target_x
-
-    def render(self):
-        self.win.erase()
-        wrapped_lines = self.get_visual_lines_with_positions()
-
-        # Display visible portion of the text
-        display_lines = wrapped_lines[
-            self.first_visible_line : self.first_visible_line + self.height
-        ]
-        for i, (line, _) in enumerate(display_lines):
-            if i < self.height:
-                self.win.addstr(i, 0, line[: self.width - 1])
-
-        # Position cursor
-        cursor_y, cursor_x = self.update_cursor_position()
-        screen_y = cursor_y - self.first_visible_line
-
-        try:
-            self.win.move(screen_y, cursor_x)
-        except curses.error:
-            pass
-
-        self.win.refresh()
+        # Find the next line's equivalent position
+        cursor_y, cursor_x = self.get_cursor_visual_pos()
+        text = ''.join(self.buffer)
+        lines = text.split('\n')
+        if cursor_y < len(lines) - 1:
+            # Move cursor to end of current line
+            pos = self.cursor_pos
+            while pos < len(text) and text[pos] != '\n':
+                pos += 1
+            # Then move to next line
+            if pos < len(text):
+                pos += 1
+                # Move to equivalent x position
+                next_line_end = pos
+                while next_line_end < len(text) and text[next_line_end] != '\n':
+                    next_line_end += 1
+                self.cursor_pos = pos + min(cursor_x, next_line_end - pos)
+                self.ensure_cursor_visible()
 
     def edit(self, ch: int) -> bool:
+        pasting = self.is_pasting()
+        
         if ch == 9:  # Tab key
             self.insert_newline()
             return False
-
-        if ch in (10, 13):  # Enter
+        
+        if ch in (10, 13):  # Enter or pasted newline
+            if pasting:
+                self.insert_newline()
+                return False
             return True
-
+            
         elif ch in (curses.KEY_BACKSPACE, 127):
             self.backspace()
-
+            
         elif ch == curses.KEY_LEFT:
             self.move_cursor_left()
-
+            
         elif ch == curses.KEY_RIGHT:
             self.move_cursor_right()
-
+            
         elif ch == curses.KEY_UP:
             self.move_cursor_up()
-
+            
         elif ch == curses.KEY_DOWN:
             self.move_cursor_down()
-
+            
         elif 32 <= ch <= 126:  # Printable characters
             self.insert_char(chr(ch))
-
+        
         self.render()
         return False
 
     def get_value(self) -> str:
-        return "".join(self.buffer)
+        return ''.join(self.buffer)
 
     def clear(self):
         self.buffer = []
@@ -210,7 +216,10 @@ class ChatTUI:
         self.tool_calls_content = ""
 
         # Only enable scroll events, let terminal handle selection
-        curses.mousemask(curses.BUTTON4_PRESSED | 0x200000)
+        curses.mousemask(curses.BUTTON4_PRESSED | 
+                    curses.BUTTON2_PRESSED | 
+                    curses.REPORT_MOUSE_POSITION)
+        print('\033[?1003h')
 
         # Initialize colors
         curses.start_color()
@@ -229,7 +238,7 @@ class ChatTUI:
 
     def resize_terminal(self):
         self.height, self.width = self.stdscr.getmaxyx()
-        self.input_reserve = 5
+        self.input_reserve = 8
         self.usable_height = self.height - self.input_reserve
         self.chat_width = self.width // 2
         self.side_width = self.width - self.chat_width - 3
@@ -263,7 +272,7 @@ class ChatTUI:
         )
         self.tool_calls_win.scrollok(True)
 
-        self.input_win = curses.newwin(3, self.width - 4, self.height - 4, 2)
+        self.input_win = curses.newwin(6, self.width - 4, self.height - 7, 2)
         self.textbox = EnhancedTextbox(self.input_win)
 
         for win in [
@@ -279,37 +288,37 @@ class ChatTUI:
         try:
             _, mx, my, _, bstate = curses.getmouse()
             scroll_happened = False
-
-            if bstate & (curses.BUTTON4_PRESSED | 0x200000):
-                if 2 <= mx < self.chat_width and 2 <= my < self.usable_height:
-                    if bstate & curses.BUTTON4_PRESSED:
-                        if self.chat_scroll > 0:
-                            self.chat_scroll -= 1
-                            scroll_happened = True
-                    else:
-                        max_scroll = max(
-                            0, self.total_chat_lines - (self.usable_height - 4)
-                        )
-                        if self.chat_scroll < max_scroll:
-                            self.chat_scroll += 1
-                            scroll_happened = True
-
-                elif (
-                    self.chat_width + 1 <= mx < self.width - 2
-                    and 2 <= my < self.raw_height + 2
-                ):
-                    if bstate & curses.BUTTON4_PRESSED:
-                        if self.raw_scroll > 0:
-                            self.raw_scroll -= 1
-                            scroll_happened = True
-                    else:
-                        self.raw_scroll += 1
+            
+            # Debug logging
+            with open("/tmp/mouse_debug.txt", "a") as f:
+                f.write(f"Mouse event: x={mx}, y={my}, bstate={bin(bstate)} ({hex(bstate)})\n")
+            
+            # Check if the click is within the chat window
+            if 2 <= mx < self.chat_width and 2 <= my < self.usable_height:
+                if bstate & curses.BUTTON4_PRESSED:  # Scroll up
+                    if self.chat_scroll > 0:
+                        self.chat_scroll -= 1
                         scroll_happened = True
-
+                elif bstate & curses.BUTTON2_PRESSED:  # Scroll down - exact match!
+                    max_scroll = max(0, self.total_chat_lines - (self.usable_height-4))
+                    if self.chat_scroll < max_scroll:
+                        self.chat_scroll += 1
+                        scroll_happened = True
+            
+            # Check if the click is within the raw window
+            elif self.chat_width+1 <= mx < self.width-2 and 2 <= my < self.raw_height+2:
+                if bstate & curses.BUTTON4_PRESSED:  # Scroll up
+                    if self.raw_scroll > 0:
+                        self.raw_scroll -= 1
+                        scroll_happened = True
+                elif bstate & curses.BUTTON2_PRESSED:  # Scroll down - exact match!
+                    self.raw_scroll += 1
+                    scroll_happened = True
+            
             if scroll_happened:
                 self.update_chat_window()
                 self.update_raw_window()
-
+                
         except curses.error:
             pass
 
@@ -326,7 +335,7 @@ class ChatTUI:
                 self.usable_height,
                 self.width - 2,
             )
-            rectangle(self.stdscr, self.height - 4, 1, self.height - 1, self.width - 2)
+            rectangle(self.stdscr, self.height - 7, 1, self.height - 1, self.width - 2)
 
             self.stdscr.addstr(1, 2, " Chat History ", curses.color_pair(2))
             self.stdscr.addstr(
