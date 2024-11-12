@@ -1,4 +1,5 @@
 data/files/*
+data/chat_storage/*
 .env
 .venv
 __pycache__
