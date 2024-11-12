@@ -35,10 +35,10 @@
     - `importance`: Float 0-1 (required)
   - Content: Information to remember, written to be independently interpretable
 
-- `<memory_load>`: Retrieve memories
+- `<memory_load>`: Retrieve memories. Defaults to searching by a mixture of relevance, recency, and importance. Use search by date to find only the most recent memories.
   - Attributes:
     - `limit`: Integer > 0 (optional, default=5)
-    - `sort`: "relevance" | "date" (optional, default="relevance")
+    - `sort`: "relevance" | "date" | "combined" (optional, default="combined")
   - Content: Query text
 
 - `<memory_update>`: Modify existing memory
