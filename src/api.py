@@ -4,12 +4,13 @@ from typing import *
 
 from src.core_prompts.prompts import load_system_prompt
 from src.scaffolding.status import basic_status
+from src.utils import ROOT
 
 dotenv.load_dotenv()
 
 client = anthropic.Anthropic()
 claude_model = "claude-3-5-sonnet-20241022"
-max_tokens_per_message = 4096
+max_tokens_per_message = 8192
 
 
 def message_from_text(text: str) -> Dict:
@@ -63,22 +64,24 @@ class Conversation:
                 {
                     "role": "assistant",
                     "content": [
-                        {"type": "text", "content": block.text} for block in content
+                        {"type": "text", "text": block.text} for block in content
                     ],
                 }
             )
             assert len(content) == 1
             response_text = content[0].text
+            with open(ROOT / "logs" / "response.txt", "w+") as f:
+                f.write(response_text)
             return response_text
 
     def last_assistant_block(self) -> List[Dict]:
         messages = []
         seen_assistant = False
         for message in self.messages[::-1]:
-            if messages.role == "assistant" and seen_assistant:
+            if message["role"] == "assistant" and seen_assistant:
                 return messages
             else:
-                if messages.role == "assistant":
+                if message["role"] == "assistant":
                     seen_assistant = True
                 messages.insert(0, message)
         return messages
