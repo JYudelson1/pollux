@@ -13,8 +13,8 @@ from src.utils import ROOT
 dotenv.load_dotenv()
 
 client = anthropic.Anthropic()
-# claude_model = "claude-3-5-sonnet-20241022"
-claude_model = "claude-3-5-sonnet-20240620"
+claude_model = "claude-3-5-sonnet-20241022"
+# claude_model = "claude-3-5-sonnet-20240620"
 max_tokens_per_message = 8192
 
 
@@ -56,7 +56,7 @@ class Conversation:
             })
             
             
-            memory_response = self.tool_server.use_tools([ParsedTag(tag="memory_load", attributes={"limit": "15", "sort": "date"}, content=" ")])
+            (memory_response, _) = self.tool_server.use_tools([ParsedTag(tag="memory_load", attributes={"limit": "15", "sort": "date"}, content=" ")])
             with open(self.chat_storage, "a+") as f:
                 f.write(memory_response)
             memory_message = message_from_text(memory_response)
@@ -88,7 +88,7 @@ class Conversation:
             assert len(content) == 1
             response_text = content[0].text
             with open(self.chat_storage, "a+") as f:
-                f.write(response_text)
+                f.write(response_text+ "\n")
                 
             return response_text
 
@@ -106,7 +106,7 @@ class Conversation:
         self.messages.append(message_from_text(user_content))
         
         with open(self.chat_storage, "a") as f:
-            f.write(user_content)
+            f.write(user_content+ "\n")
 
         return self._send_and_receive()
 
@@ -129,10 +129,28 @@ class Conversation:
         # If none of the tools need to be looked at, simply processes the 
         # tool calls and returns None
         
-        system_response = self.tool_server.use_tools(tool_calls)
+        (info_msgs, success_messages) = self.tool_server.use_tools(tool_calls)
         
-        if system_response is not None:
+        # Handle informational responses right away
+        # Success messages are more complicated: If there are no info messages, bundle them with the next user query. If there are info messages, you might as well send them now
+        if info_msgs is not None:
+            
+            # Bundle the messages together if we have both kinds
+            if success_messages is not None:
+                info_msgs += success_messages
+                
+            # Temp storage
             with open(self.chat_storage, "a+") as f:
-                f.write(system_response)
-            self.messages.append(message_from_text(system_response))
+                f.write(info_msgs + "\n")
+                
+            self.messages.append(message_from_text(info_msgs))
             return self._send_and_receive()
+        else: 
+            # No informational messages to handle
+            if success_messages is not None:
+                # Temp storage
+                with open(self.chat_storage, "a+") as f:
+                    f.write(success_messages + "\n")
+                    
+                # Add this message but don't send it yet. It will be bundled with the next call
+                self.messages.append(message_from_text(success_messages))

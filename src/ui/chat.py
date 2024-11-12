@@ -476,7 +476,10 @@ class ChatTUI:
                     self.update_tool_calls_window()
                     
                     # Try to once again respond to calls
-                    tool_output = self.conversation.use_tools(tags)
+                    if tags is not []:
+                        tool_output = self.conversation.use_tools(tags)
+                    else:
+                        tool_output = None
                     
 
             except KeyboardInterrupt:
