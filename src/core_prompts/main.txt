@@ -19,5 +19,5 @@ Here is the documentation for the xml-based tool use and communication system yo
 
 {xml_docs_prompt}
 
-It is strongly recommended that you search through the past five or ten memories you've created, in order to get yourself up to speed.
+It is strongly recommended that you search through the past five or ten memories you've created, in order to get yourself up to speed. That is, consider calling `<memory_load limit="10", sort="date"></memory_load>` in your first message. You'll be happy you did.
 </core_prompt>
