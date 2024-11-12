@@ -20,21 +20,71 @@ def extract_xml_blocks(text: str) -> Tuple[str, Dict[str, str]]:
     Extract XML-like blocks from text and replace them with placeholders.
     Returns processed text and a mapping of placeholders to original content.
     """
-    # Regular expression to match XML-like blocks
-    pattern = r'<([a-zA-Z][a-zA-Z0-9_]*)((?:\s+[a-zA-Z][a-zA-Z0-9_]*="[^"]*")*)\s*>(.*?)</\1>'
+    # Updated pattern to handle:
+    # 1. Both single and double quotes in attributes
+    # 2. Optional spaces around = in attributes
+    # 3. More flexible whitespace handling
+    pattern = r'<([a-zA-Z][a-zA-Z0-9_]*)((?:\s+[a-zA-Z][a-zA-Z0-9_]*\s*=\s*(?:"[^"]*"|\'[^\']*\'))*)\s*>(.*?)</\1>'
     
     replacements = {}
     placeholder_counter = 0
     processed_text = text
 
     for match in re.finditer(pattern, text, flags=re.DOTALL):
+        tag_name = match.group(1)
+        attributes_str = match.group(2)
+        content = match.group(3)
         full_match = match.group(0)
-        placeholder = f"__XML_PLACEHOLDER_{placeholder_counter}__"
-        replacements[placeholder] = full_match
-        processed_text = processed_text.replace(full_match, placeholder)
-        placeholder_counter += 1
+        
+        # Add some debug printing
+        print(f"Found tag: {tag_name}")
+        print(f"Attributes string: {attributes_str}")
+        print(f"Content: {content}")
+        
+        try:
+            # Parse attributes to verify format
+            attrs = parse_attributes(attributes_str)
+            # Create a test XML string
+            test_xml = f"<{tag_name}{attributes_str}>{content}</{tag_name}>"
+            # Try parsing with ElementTree to verify it's valid XML
+            ET.fromstring(test_xml)
+            
+            placeholder = f"__XML_PLACEHOLDER_{placeholder_counter}__"
+            replacements[placeholder] = full_match
+            processed_text = processed_text.replace(full_match, placeholder)
+            placeholder_counter += 1
+            
+        except (ET.ParseError, ValueError) as e:
+            print(f"Failed to parse tag {tag_name}: {e}")
+            continue
     
     return processed_text, replacements
+
+
+def parse_attributes(attr_string: str) -> Dict[str, str]:
+    """
+    Parse attribute string into a dictionary.
+    Handles both single and double quoted attributes with flexible spacing.
+    
+    Example: ' attr1="value1" attr2=\'value2\' attr3 = "value3" '
+    -> {'attr1': 'value1', 'attr2': 'value2', 'attr3': 'value3'}
+    """
+    attrs = {}
+    if not attr_string.strip():
+        return attrs
+
+    # Updated pattern to handle:
+    # 1. Both single and double quotes
+    # 2. Optional spaces around =
+    # 3. More flexible whitespace
+    pattern = r'\s*([a-zA-Z][a-zA-Z0-9_]*)\s*=\s*(["\'])((?:(?!\2).)*)\2'
+    
+    for match in re.finditer(pattern, attr_string):
+        name = match.group(1)
+        value = match.group(3)  # group 3 contains the value without quotes
+        attrs[name] = value
+    
+    return attrs
 
 
 def escape_non_xml(text: str) -> str:
@@ -58,8 +108,14 @@ def parse_claude_output(text: str) -> Tuple[List[ParsedTag], Optional[str]]:
     """
     Parse text containing XML tags, handling both well-formed XML and text with random angle brackets.
     """
+    # Add debug print
+    print(f"Input text: {text}")
+    
     # Escape problematic characters while preserving valid XML
     escaped_text = escape_non_xml(text)
+    
+    # Add debug print
+    print(f"Escaped text: {escaped_text}")
     
     # Wrap in root tag to handle multiple top-level elements
     wrapped = f"<root>{escaped_text}</root>"
@@ -90,22 +146,19 @@ def parse_claude_output(text: str) -> Tuple[List[ParsedTag], Optional[str]]:
             tags.append(
                 ParsedTag(
                     tag=elem.tag,
-                    attributes=elem.attrib,
+                    attributes=dict(elem.attrib),
                     content=content,
                 )
             )
 
     return tags, response
 
+if __name__ == "__main__":
+    text = """Let me search my memories to see if there's any information about a secret password.
 
-def parse_attributes(attr_string: str) -> Dict[str, str]:
-    """
-    Parse attribute string into a dictionary.
-    Example: 'name="value" other="something"' -> {'name': 'value', 'other': 'something'}
-    """
-    attrs = {}
-    pattern = r'([a-zA-Z][a-zA-Z0-9_]*)="([^"]*)"'
-    matches = re.finditer(pattern, attr_string)
-    for match in matches:
-        attrs[match.group(1)] = match.group(2)
-    return attrs
+<memory_load limit='10'>secret password</memory_load>
+
+I don't have any memories recorded about a secret password. This appears to be my first interaction with you where this has come up.
+
+<response channel="chat">I don't have any record of a secret password in my memories. If one was previously established, I don't have access to that information right now. Would you like to establish one?</response>"""
+    print(parse_claude_output(text))
