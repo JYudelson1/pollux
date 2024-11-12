@@ -155,7 +155,7 @@ def parse_claude_output(text: str) -> Tuple[List[ParsedTag], Optional[str]]:
         
         if elem.tag == "response":
             if response is not None:
-                raise ValueError("Multiple response tags found")
+                response += f"\n{content}"
             response = content
         else:
             tags.append(
@@ -170,44 +170,64 @@ def parse_claude_output(text: str) -> Tuple[List[ParsedTag], Optional[str]]:
 
 
 if __name__ == "__main__":
-    text = """<response channel="chat">Looking at my hallucinations and the prompts I was given, I can identify several issues:
+    text = """
+<response channel="chat">Ah, I see the actual SourceTool implementation is cleaner and has better error handling. Let me revise my FileTool proposal:
 
-1. In my XML documentation (`<core_prompt name="xml_docs">`), there's a very clear warning about tool response hallucination that I failed to follow:
+```python
+from src.utils import ROOT
+from pathlib import Path
 
+class FileTool():
+    def __init__(self) -> None:
+        self.files_path = ROOT / "user_files"
+        self.files_path.mkdir(exist_ok=True)
+    
+    def read_file(self, path: str) -> str:
+        path = self.files_path / path
+
+        if not path.exists():
+            raise FileNotFoundError(f"File {path} not found")
+        if not path.is_file():
+            raise ValueError(f"{path} is not a file")
+        return path.read_text()
+        
+    def write_file(self, path: str, content: str, mode: str = "overwrite") -> str:
+        path = self.files_path / path
+        
+        # Ensure parent directories exist
+        path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Validate mode
+        if mode not in ["append", "overwrite"]:
+            raise ValueError("Mode must be 'append' or 'overwrite'")
+            
+        # Write file
+        write_mode = 'a' if mode == "append" else 'w'
+        path.write_text(content)
+        return "File written successfully"
+        
+    def list_files(self, path: str = "") -> str:
+        if path != "":
+            path = self.files_path / path
+        else:
+            path = self.files_path
+            
+        if not path.exists():
+            raise FileNotFoundError(f"Directory {path} not found")
+        if not path.is_dir():
+            raise ValueError(f"{path} is not a directory")
+            
+        files = [f.relative_to(self.files_path).as_posix() 
+                for f in path.glob("*")]
+        return "\n".join(sorted(files))
 ```
-## Critical Warning About Tool Response Hallucination
-- NEVER assume or imagine the contents of system responses
-- Always wait for explicit `<system>` responses before acting on tool calls
-- If no `<system>` response is shown, the tool results are unknown
-- It is better to acknowledge missing information than to hallucinate responses
-```
 
-2. Despite this, I:
-   - Invented file contents before getting `<system>` responses
-   - Continued conversations assuming I had data I didn't have
-   - Built on hallucinated responses instead of waiting for real ones
-   - Failed to properly acknowledge when commands failed
+Key improvements:
+1. Uses pathlib.Path consistently
+2. Proper error handling with specific exceptions
+3. Uses relative_to() for clean path display in list_files
+4. Consistent with SourceTool's style and approach
+5. Uses ROOT from utils like SourceTool does
 
-3. Looking at the XML docs again, there's guidance I should have followed:
-   ```
-   Multiple tool calls in one output will execute in order and return all results together
-   ```
-   I should have waited for each `<system>` response before proceeding with analysis or additional commands.
-
-4. I also notice that in my self-description (`<core_prompt name="self">`), there's emphasis on:
-   ```
-   - Use internal scratchpad liberally for reasoning and planning
-   - Before any tool use:
-     1. Think through the purpose and necessity
-     2. Consider alternatives
-     3. Plan sequence of operations if multiple steps needed
-   ```
-
-I think I got excited about exploring and jumped straight to actions without proper planning and validation. I should have:
-1. Made one tool call at a time
-2. Waited for and explicitly acknowledged each response
-3. Only proceeded based on actual received data, not assumptions
-4. Been more explicit about my reasoning process in my scratchpad
-
-Would you share your thoughts on this? I'm particularly interested if you noticed other patterns or causes I might have missed.</response>"""
+Would you like me to explain any part of this implementation?</response>"""
     print(parse_claude_output(text))

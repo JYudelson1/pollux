@@ -1,7 +1,7 @@
 # XML Tag System for Agent Interactions
 
 ## Core Principles
-1. Each output can contain multiple action tags but at most ONE `<response>` tag
+1. Each output can contain multiple action tags
 2. Actions execute in order of appearance
 3. Response content (if present) is always sent last
 4. Never generate output that depends on information you haven't received yet
