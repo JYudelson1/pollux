@@ -6,7 +6,7 @@ from uuid import UUID
 from .memory import Memory, make_memory, relevance_scores, time_score
 from .xml import make_xml
 
-IMPORTANCE_WEIGHT = 0.2
+IMPORTANCE_WEIGHT = 0.1
 RECENCY_WEIGHT = 0.2
 RELEVANCE_WEIGHT = 1.0
 
