@@ -1,11 +1,14 @@
 from typing import *
 
 from src.tools.memory import MemoryTool
+from src.tools.source import SourceTool
+
 from src.scaffolding.xml_parser import ParsedTag
 
 class ToolServer:
     def __init__(self) -> None:
         self.memory_tool: MemoryTool = MemoryTool()
+        self.source_tool: SourceTool = SourceTool()
         
     def use_tools(self, tools: List[ParsedTag]) -> Optional[str]:
         system_response = ""
@@ -34,5 +37,9 @@ class ToolServer:
             return self.memory_tool.save_memory(text=tag.content, **tag.attributes)
         elif tag.tag == "memory_delete":
             return self.memory_tool.delete_memory(uuid=tag.attributes["id"])
+        elif tag.tag == "src_read":
+            return self.source_tool.read_src(**tag.attributes)
+        elif tag.tag == "src_list":
+            return self.source_tool.list_src(**tag.attributes)
         else:
             raise NotImplementedError
