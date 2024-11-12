@@ -36,11 +36,6 @@ def extract_xml_blocks(text: str) -> Tuple[str, Dict[str, str]]:
         content = match.group(3)
         full_match = match.group(0)
         
-        # Add some debug printing
-        print(f"Found tag: {tag_name}")
-        print(f"Attributes string: {attributes_str}")
-        print(f"Content: {content}")
-        
         try:
             # Parse attributes to verify format
             attrs = parse_attributes(attributes_str)
@@ -55,7 +50,7 @@ def extract_xml_blocks(text: str) -> Tuple[str, Dict[str, str]]:
             placeholder_counter += 1
             
         except (ET.ParseError, ValueError) as e:
-            print(f"Failed to parse tag {tag_name}: {e}")
+            # print(f"Failed to parse tag {tag_name}: {e}")
             continue
     
     return processed_text, replacements
@@ -108,14 +103,9 @@ def parse_claude_output(text: str) -> Tuple[List[ParsedTag], Optional[str]]:
     """
     Parse text containing XML tags, handling both well-formed XML and text with random angle brackets.
     """
-    # Add debug print
-    print(f"Input text: {text}")
     
     # Escape problematic characters while preserving valid XML
     escaped_text = escape_non_xml(text)
-    
-    # Add debug print
-    print(f"Escaped text: {escaped_text}")
     
     # Wrap in root tag to handle multiple top-level elements
     wrapped = f"<root>{escaped_text}</root>"
