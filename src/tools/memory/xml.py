@@ -1,4 +1,4 @@
-from memory import Memory
+from .memory import Memory
 from datetime import datetime
 from typing import *
 from uuid import UUID

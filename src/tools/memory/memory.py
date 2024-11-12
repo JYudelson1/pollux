@@ -5,7 +5,7 @@ from uuid import uuid4, UUID
 
 import numpy as np
 
-from embedding import Embedding, embed_query, embed_memory
+from .embedding import Embedding, embed_query, embed_memory
 
 @dataclass
 class Memory:
@@ -21,7 +21,7 @@ def make_memory(text: str, importance: float) -> Memory:
     
 def relevance_scores(text: str, memories: List[Memory]) -> Dict[UUID, float]:
     query_embed = embed_query(text)
-    scores = np.dot([m.embedding for m in memories], query_embed)
+    scores = np.dot(np.array([m.embedding for m in memories]), np.array(query_embed))
     return {memories[i].uuid: scores[i] for i in range(len(memories))}
 
 def time_score(memory: Memory) -> float:
@@ -30,10 +30,10 @@ def time_score(memory: Memory) -> float:
     
     span = memory.timestamp - start
     
-    span / total
+    return span / total
     
 if __name__ == "__main__":
-    m1 = make_memory("Pinapple apple banana pear")
-    m2 = make_memory("Cars go vroom")
+    m1 = make_memory("Pinapple apple banana pear", 0.0)
+    m2 = make_memory("Cars go vroom", 0.0)
     
     print(relevance_scores("Fruit", [m1, m2]))
