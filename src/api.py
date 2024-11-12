@@ -1,6 +1,8 @@
 import anthropic
 import dotenv
+import pathlib
 from typing import *
+from datetime import datetime
 
 from src.core_prompts.prompts import load_system_prompt
 from src.scaffolding.status import basic_status
@@ -11,7 +13,8 @@ from src.utils import ROOT
 dotenv.load_dotenv()
 
 client = anthropic.Anthropic()
-claude_model = "claude-3-5-sonnet-20241022"
+# claude_model = "claude-3-5-sonnet-20241022"
+claude_model = "claude-3-5-sonnet-20240620"
 max_tokens_per_message = 8192
 
 
@@ -27,14 +30,19 @@ class Channel:
 class Conversation:
     messages: List[Dict]
     tool_server: ToolServer
+    chat_storage: pathlib.Path
 
     def __init__(self, with_system_prompt: bool = True) -> None:
         self.messages = []
         self.tool_server = ToolServer()
+        
+        now = datetime.now()
+        self.chat_storage = ROOT / "data" / "chat_storage" / f"{now.month}_{now.day}_{now.year}__{now.hour}:{now.minute}:{now.second}.txt"
 
         if with_system_prompt:
             system_prompt = load_system_prompt()
             system_message = message_from_text(system_prompt)
+            system_message["content"][0]["cache_control"] = {"type": "ephemeral"}
             self.messages.append(system_message)
 
             status = basic_status()
@@ -42,10 +50,11 @@ class Conversation:
             self.messages.append(status_message)
             
     def _send_and_receive(self) -> str:
-        response = client.messages.create(
+        response = client.beta.prompt_caching.messages.create(
             model=claude_model,
             max_tokens=max_tokens_per_message,
             messages=self.messages,
+            
         )
 
         if response.type == "error":
@@ -62,7 +71,7 @@ class Conversation:
             )
             assert len(content) == 1
             response_text = content[0].text
-            with open(ROOT / "logs" / "conversation.txt", "a+") as f:
+            with open(self.chat_storage, "a+") as f:
                 f.write(response_text)
                 
             return response_text
@@ -80,7 +89,7 @@ class Conversation:
 
         self.messages.append(message_from_text(user_content))
         
-        with open(ROOT / "logs" / "conversation.txt", "a") as f:
+        with open(self.chat_storage, "a") as f:
             f.write(user_content)
 
         return self._send_and_receive()
@@ -107,7 +116,7 @@ class Conversation:
         system_response = self.tool_server.use_tools(tool_calls)
         
         if system_response is not None:
-            with open(ROOT / "logs" / "conversation.txt", "a+") as f:
+            with open(self.chat_storage, "a+") as f:
                 f.write(system_response)
             self.messages.append(message_from_text(system_response))
             return self._send_and_receive()
